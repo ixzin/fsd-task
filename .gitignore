@@ -24,6 +24,10 @@ coverage/
 .env.*
 !.env.example
 
+# Local Docker overrides
+docker-compose.yml
+!docker-compose.example.yml
+
 # IDEs and editors
 .idea/
 .vscode/*

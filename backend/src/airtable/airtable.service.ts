@@ -37,7 +37,8 @@ export class AirtableService {
   ) {}
 
   getOAuthUrl(state: string = randomUUID()) {
-    const clientId = this.configService.getOrThrow<string>('AIRTABLE_CLIENT_ID');
+    const clientId =
+      this.configService.getOrThrow<string>('AIRTABLE_CLIENT_ID');
     const redirectUri = this.configService.getOrThrow<string>(
       'AIRTABLE_REDIRECT_URI',
     );
@@ -99,9 +100,7 @@ export class AirtableService {
     let pagesCount = 0;
 
     for (const base of bases) {
-      const tables = dto.tableId
-        ? [{ id: dto.tableId, name: dto.tableId }]
-        : await this.getTables(base.id);
+      const tables = await this.getTablesForSync(base.id, dto.tableId);
 
       tablesCount += tables.length;
 
@@ -152,6 +151,22 @@ export class AirtableService {
     }
 
     return this.airtablePageModel.find(query).lean();
+  }
+
+  private async getTablesForSync(baseId: string, tableId?: string) {
+    const tables = await this.getTables(baseId);
+
+    if (!tableId) {
+      return tables;
+    }
+
+    const table = tables.find((currentTable) => currentTable.id === tableId);
+
+    if (!table) {
+      throw new BadRequestException(`Table ${tableId} was not found`);
+    }
+
+    return [table];
   }
 
   private async getAllRecords(baseId: string, tableId: string) {
@@ -231,10 +246,7 @@ export class AirtableService {
     });
   }
 
-  private async airtableRequest<T>(
-    path: string,
-    retried = false,
-  ): Promise<T> {
+  private async airtableRequest<T>(path: string, retried = false): Promise<T> {
     const token = await this.getValidToken();
     const apiBaseUrl = this.configService.getOrThrow<string>(
       'AIRTABLE_API_BASE_URL',
@@ -264,7 +276,9 @@ export class AirtableService {
     const token = await this.airtableTokenModel.findOne({ providerUserId });
 
     if (!token) {
-      const accessToken = this.configService.get<string>('AIRTABLE_ACCESS_TOKEN');
+      const accessToken = this.configService.get<string>(
+        'AIRTABLE_ACCESS_TOKEN',
+      );
 
       if (accessToken) {
         return { accessToken };
@@ -305,13 +319,13 @@ export class AirtableService {
   }
 
   private async requestToken(body: Record<string, string>) {
-    const clientId = this.configService.getOrThrow<string>('AIRTABLE_CLIENT_ID');
+    const clientId =
+      this.configService.getOrThrow<string>('AIRTABLE_CLIENT_ID');
     const clientSecret = this.configService.getOrThrow<string>(
       'AIRTABLE_CLIENT_SECRET',
     );
-    const tokenUrl = this.configService.getOrThrow<string>(
-      'AIRTABLE_TOKEN_URL',
-    );
+    const tokenUrl =
+      this.configService.getOrThrow<string>('AIRTABLE_TOKEN_URL');
     const response = await fetch(tokenUrl, {
       method: 'POST',
       headers: {
@@ -330,7 +344,10 @@ export class AirtableService {
     return response.json() as Promise<AirtableTokenResponse>;
   }
 
-  private async saveToken(providerUserId: string, token: AirtableTokenResponse) {
+  private async saveToken(
+    providerUserId: string,
+    token: AirtableTokenResponse,
+  ) {
     return this.airtableTokenModel.findOneAndUpdate(
       { providerUserId },
       {

@@ -28,4 +28,7 @@ export class AirtablePage {
 }
 
 export const AirtablePageSchema = SchemaFactory.createForClass(AirtablePage);
-AirtablePageSchema.index({ baseId: 1, tableId: 1, recordId: 1 }, { unique: true });
+AirtablePageSchema.index(
+  { baseId: 1, tableId: 1, recordId: 1 },
+  { unique: true },
+);
