@@ -5,14 +5,14 @@
 Create an Airtable account and prepare the following tables:
 
 * `Tickets`
-* `Users`
+* `Users` (the name must be exactly `Users` for the users endpoint)
 
 Your Airtable account should:
 
 * use email/password authentication
 * have MFA enabled
 
-It is recommended to create at least 200 records and update Status/Assignee fields multiple times to generate revision history
+It is recommended to create at least 200 records and update Status/Assignee fields multiple times to generate revision history.
 
 ---
 
@@ -20,11 +20,17 @@ It is recommended to create at least 200 records and update Status/Assignee fiel
 
 Go to the backend folder and copy:
 
-```bash id="jlwm"
+```bash
 .env.example -> .env
 ```
 
-Configure all required environment variables
+Configure all required environment variables.
+
+The Airtable OAuth redirect URI should be:
+
+```bash
+http://localhost:3000/airtable/oauth/callback
+```
 
 ---
 
@@ -32,11 +38,11 @@ Configure all required environment variables
 
 Copy:
 
-```bash id="8’wini"
-.docker-compose.example.yml -> docker-compose.yml
+```bash
+docker-compose.example.yml -> docker-compose.yml
 ```
 
-Configure the required variables if needed
+Configure the required variables if needed.
 
 ---
 
@@ -44,7 +50,7 @@ Configure the required variables if needed
 
 Open terminal in the backend folder and run:
 
-```bash id="7’wini"
+```bash
 docker compose up -d
 ```
 
@@ -54,7 +60,7 @@ docker compose up -d
 
 Go to the project root and run:
 
-```bash id="6’wini"
+```bash
 npm run install:all
 ```
 
@@ -64,7 +70,7 @@ npm run install:all
 
 Run:
 
-```bash id="5’wini"
+```bash
 npm --prefix backend exec puppeteer browsers install chrome
 ```
 
@@ -74,7 +80,7 @@ npm --prefix backend exec puppeteer browsers install chrome
 
 Run:
 
-```bash id="4’wini"
+```bash
 npm run dev
 ```
 
@@ -99,28 +105,28 @@ Available actions:
 
 ### OAuth Connect
 
-Authenticates with Airtable using OAuth flow
+Authenticates with Airtable using OAuth flow.
 
 ### Sync Pages
 
-Synchronizes Airtable records with MongoDB
+Synchronizes Airtable records with MongoDB.
 
 ### Load Revisions
 
-Loads revision history changes from Airtable internal endpoints using network requests only without UI rendering
+Loads already stored revision history records from MongoDB.
 
 ### Sync Revisions
 
-Synchronizes parsed revision history records with MongoDB
+Fetches Airtable revision history from the internal revision endpoint, parses Status/Assignee changes, and stores them in MongoDB.
 
 ### Connect Revision History
 
-Creates authenticated Airtable session cookies required for revision history requests
+Creates authenticated Airtable session cookies required for revision history requests.
 
 ---
 
 # Important Notes
 
-Airtable uses anti-bot protection for login and revision history endpoints
+Airtable uses anti-bot protection for login and revision history endpoints.
 
-Because of this, Puppeteer runs in `headless: false` mode for authenticated revision history sessions
+Because of this, Puppeteer runs in `headless: false` mode for authenticated revision history sessions.
