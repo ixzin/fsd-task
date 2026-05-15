@@ -1,0 +1,126 @@
+<main class="page-shell">
+  <header class="page-header">
+    <h1>Raw Data</h1>
+    <div class="header-actions">
+      <button mat-flat-button type="button" (click)="syncPages()" [disabled]="loading">
+        New Grid
+      </button>
+      <button mat-stroked-button type="button" (click)="loadPages()" [disabled]="loading">
+        Refresh
+      </button>
+    </div>
+  </header>
+
+  <section class="toolbar">
+    <mat-form-field appearance="outline" class="toolbar-field">
+      <mat-label>Active Integrations</mat-label>
+      <mat-select [(ngModel)]="activeIntegration">
+        <mat-option value="airtable">Airtable</mat-option>
+      </mat-select>
+    </mat-form-field>
+  
+    <mat-form-field appearance="outline" class="toolbar-field">
+      <mat-label>Base</mat-label>
+      <mat-select [(ngModel)]="selectedBaseId" (selectionChange)="onBaseChange()">
+        <mat-option value="">Select base</mat-option>
+        @for (base of bases; track base.id) {
+          <mat-option [value]="base.id">{{ base.name }}</mat-option>
+        }
+      </mat-select>
+      </mat-form-field>
+  
+    <mat-form-field appearance="outline" class="toolbar-field">
+      <mat-label>Entity</mat-label>
+      <mat-select [(ngModel)]="selectedTableId" (selectionChange)="onTableChange()">
+        <mat-option value="">Select entity</mat-option>
+        @for (table of tables; track table.id) {
+          <mat-option [value]="table.id">{{ table.name }}</mat-option>
+        }
+      </mat-select>
+      </mat-form-field>
+  
+    <mat-form-field appearance="outline" class="toolbar-field search-field">
+      <mat-label>Search</mat-label>
+      <input matInput type="search" [(ngModel)]="searchText" />
+      <mat-icon matSuffix>search</mat-icon>
+    </mat-form-field>
+  
+    <div class="actions">
+      <button mat-flat-button class="action-button" type="button" (click)="syncPages()" [disabled]="loading">
+        Sync pages
+      </button>
+      <button mat-flat-button class="action-button" type="button" (click)="loadRevisions()" [disabled]="loading">
+        Load revisions
+      </button>
+      <button mat-flat-button class="action-button" type="button" (click)="syncRevisions()" [disabled]="loading">
+        Sync revisions
+      </button>
+      <button mat-flat-button class="action-button danger-button" type="button" (click)="auth()" [disabled]="loading">
+        OAuth Connect
+      </button>
+    </div>
+
+    <details class="revision-connect">
+      <summary>
+        <span>Connect Revision History</span>
+        <small>Type your auth params and get revision cookies</small>
+      </summary>
+
+      <div class="actions revision-form">
+        <mat-form-field appearance="outline" class="auth-field">
+          <mat-label>Email</mat-label>
+          <input matInput [(ngModel)]="authData.email" />
+        </mat-form-field>
+        
+        <mat-form-field appearance="outline" class="auth-field">
+          <mat-label>Password</mat-label>
+          <input matInput [(ngModel)]="authData.password" type="password" />
+        </mat-form-field>
+        
+        <mat-form-field appearance="outline" class="auth-field">
+          <mat-label>MFA code</mat-label>
+          <input matInput [(ngModel)]="authData.mfaCode" />
+        </mat-form-field>
+
+        <button mat-flat-button class="action-button" type="button" (click)="loginRevisionCookies()" [disabled]="loading">
+          Connect Revision History
+        </button>
+      </div>
+
+      @if (cookiesError) {
+      <div class="error">{{ cookiesError }}</div>
+      }
+    </details>
+  </section>
+
+  <section class="status-row">
+    @if (loading) {
+      <span>Loading...</span>
+    }
+
+    @if (error) {
+      <span class="error">{{ error }}</span>
+    }
+
+    @if (lastSyncMessage) {
+      <span class="success">{{ lastSyncMessage }}</span>
+    }
+  </section>
+
+  <section class="grid-panel">
+    <ag-grid-angular
+      class="raw-data-grid"
+      [theme]="gridTheme"
+      [rowData]="rowData"
+      [columnDefs]="colDefs"
+      [defaultColDef]="defaultColDef"
+      [quickFilterText]="searchText"
+      [pagination]="true"
+      [paginationPageSize]="100"
+      [paginationPageSizeSelector]="[25, 50, 100, 200]"
+      rowSelection="multiple"
+    ></ag-grid-angular>
+
+    <footer class="grid-footer">Rows loaded {{ pages.length }}</footer>
+  </section>
+</main>

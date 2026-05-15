@@ -22,6 +22,8 @@ import type {
 
 const REVISION_COOKIE_SESSION_KEY = 'default';
 const REVISION_REQUEST_TIMEOUT_MS = 30_000;
+const REVISION_HISTORY_PAGE_LIMIT = 10;
+const MAX_REVISION_HISTORY_PAGES = 1000;
 
 @Injectable()
 export class AirtableRevisionsService {
@@ -35,7 +37,7 @@ export class AirtableRevisionsService {
     private readonly airtableRevisionModel: Model<AirtableRevision>,
     @InjectModel(AirtableRevisionCookie.name)
     private readonly airtableRevisionCookieModel: Model<AirtableRevisionCookie>,
-  ) { }
+  ) {}
 
   async getStoredRevisions(filters: {
     baseId?: string;
@@ -136,8 +138,6 @@ export class AirtableRevisionsService {
         cookiesCount: airtableCookies.length,
         sessionKey: savedCookies.sessionKey,
       };
-    } catch (error) {
-      throw error;
     } finally {
       await browser.close();
     }
@@ -190,29 +190,45 @@ export class AirtableRevisionsService {
   }
 
   private async storeRevision(revisionsCount: number, page: AirtablePage) {
-    const response = await this.fetchRevisionHistoryResponse(
-      page.baseId,
-      page.recordId,
-    );
+    const revisions: ParsedAirtableRevision[] = [];
+    let offsetV2: string | null | undefined = null;
+    let revisionPage = 1;
 
-    if (response.status === 401 || response.status === 403) {
-      throw new BadRequestException(
-        'Airtable revision cookies are expired or invalid',
+    do {
+      const response = await this.fetchRevisionHistoryResponse(
+        page.baseId,
+        page.recordId,
+        offsetV2,
       );
-    }
 
-    if (!response.ok) {
-      throw new InternalServerErrorException(
-        `Airtable revision request failed: ${response.status} ${await response.text()}`,
-      );
-    }
+      if (response.status === 401 || response.status === 403) {
+        throw new BadRequestException(
+          'Airtable revision cookies are expired or invalid',
+        );
+      }
 
-    const html = await response.text();
-    const revisions = this.parseRevisionHistoryHtml(html, {
-      baseId: page.baseId,
-      tableId: page.tableId,
-      recordId: page.recordId,
-    });
+      if (!response.ok) {
+        throw new InternalServerErrorException(
+          `Airtable revision request failed: ${response.status} ${await response.text()}`,
+        );
+      }
+
+      const body = await response.text();
+      const parsedRevisionPage = this.parseRevisionHistoryHtml(body, {
+        baseId: page.baseId,
+        tableId: page.tableId,
+        recordId: page.recordId,
+      });
+
+      revisions.push(...parsedRevisionPage.revisions);
+      offsetV2 = parsedRevisionPage.offsetV2;
+
+      if (++revisionPage > MAX_REVISION_HISTORY_PAGES) {
+        throw new InternalServerErrorException(
+          'Too many Airtable revision pages. Pagination may be stuck.',
+        );
+      }
+    } while (offsetV2);
 
     revisionsCount += revisions.length;
     await this.storeRevisions(
@@ -261,7 +277,11 @@ export class AirtableRevisionsService {
     return page;
   }
 
-  private async fetchRevisionHistoryResponse(baseId: string, recordId: string) {
+  private async fetchRevisionHistoryResponse(
+    baseId: string,
+    recordId: string,
+    offsetV2?: string | null,
+  ) {
     const cookieHeader = await this.getRevisionCookieHeader();
     const revisionUrl = new URL(
       this.configService
@@ -269,8 +289,8 @@ export class AirtableRevisionsService {
         .replace('{recordId}', encodeURIComponent(recordId)),
     );
     const stringifiedObjectParams = JSON.stringify({
-      limit: 10,
-      offsetV2: null,
+      limit: REVISION_HISTORY_PAGE_LIMIT,
+      offsetV2: offsetV2 ?? null,
       shouldReturnDeserializedActivityItems: true,
       shouldIncludeRowActivityOrCommentUserObjById: true,
     });
@@ -341,13 +361,37 @@ export class AirtableRevisionsService {
       };
       const ids = response.data?.orderedActivityAndCommentIds ?? [];
       const activities = response.data?.rowActivityInfoById ?? {};
+      const offsetV2 = this.findOffsetV2(response);
 
-      return ids.flatMap((activityId) =>
-        this.parseActivityDiffHtml(activityId, activities[activityId], page),
-      );
+      return {
+        revisions: ids.flatMap((activityId) =>
+          this.parseActivityDiffHtml(activityId, activities[activityId], page),
+        ),
+        offsetV2,
+      };
     } catch {
-      return [];
+      return { revisions: [], offsetV2: undefined };
     }
+  }
+
+  private findOffsetV2(value: unknown): string | undefined {
+    if (!value || typeof value !== 'object') {
+      return undefined;
+    }
+
+    if ('offsetV2' in value && typeof value.offsetV2 === 'string') {
+      return value.offsetV2;
+    }
+
+    for (const nestedValue of Object.values(value)) {
+      const offsetV2 = this.findOffsetV2(nestedValue);
+
+      if (offsetV2) {
+        return offsetV2;
+      }
+    }
+
+    return undefined;
   }
 
   private parseActivityDiffHtml(

@@ -1,11 +1,16 @@
-import { Body, Controller, Get, Post, Query } from '@nestjs/common';
+import { Body, Controller, Get, Post, Query, Res } from '@nestjs/common';
 import { AirtableService } from './airtable.service';
 import { OAuthCallbackDto } from './dto/oauth-callback.dto';
 import { SyncAirtableDto } from './dto/sync-airtable.dto';
+import type { Response } from 'express';
+import { ConfigService } from '@nestjs/config';
 
 @Controller('airtable')
 export class AirtableController {
-  constructor(private readonly airtableService: AirtableService) {}
+  constructor(
+    private readonly airtableService: AirtableService,
+    private readonly configService: ConfigService,
+  ) {}
 
   @Get('oauth/url')
   getOAuthUrl(@Query('state') state?: string) {
@@ -13,8 +18,15 @@ export class AirtableController {
   }
 
   @Get('oauth/callback')
-  handleOAuthCallback(@Query() query: OAuthCallbackDto) {
-    return this.airtableService.handleOAuthCallback(query.code, query.state);
+  async handleOAuthCallback(
+    @Query() query: OAuthCallbackDto,
+    @Res() res: Response,
+  ) {
+    await this.airtableService.handleOAuthCallback(query.code, query.state);
+
+    const frontEndUrl = this.configService.getOrThrow<string>('FRONTEND_URL');
+
+    return res.redirect(`${frontEndUrl}/airtable/success`);
   }
 
   @Post('sync')

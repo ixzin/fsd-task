@@ -7,7 +7,7 @@ import { SyncRevisionsDto } from './dto/sync-revisions.dto';
 export class AirtableRevisionsController {
   constructor(
     private readonly airtableRevisionsService: AirtableRevisionsService,
-  ) { }
+  ) {}
 
   @Post('revision-cookies/login')
   acquireRevisionCookies(@Body() dto: RevisionCookieLoginDto) {
